@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2:2 Photo Capture</title>
+  <script src="/static/js/webcam.min.js"></script>
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 1.8em;
+      margin-bottom: 1em;
+    }
+
+    #camera {
+      width: 90vmin;
+      height: 90vmin;
+      margin: auto;
+      background: #222;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: transform 0.3s ease;
+    }
+
+    .btn-group {
+      margin-top: 20px;
+    }
+
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      font-size: 1em;
+      border: none;
+      border-radius: 8px;
+      background-color: #1e90ff;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0f78d4;
+    }
+  </style>
+</head>
+<body>
+  <h1>📸 Take 2:2 Photo</h1>
+  <div id="camera"></div>
+
+  <div class="btn-group">
+    <button onclick="rotateLeft()">↩️ Rotate Left</button>
+    <button onclick="rotateRight()">↪️ Rotate Right</button>
+    <button onclick="takeSnapshot()">📸 Capture</button>
+  </div>
+
+  <script>
+    let rotation = 0;
+
+    Webcam.set({
+      width: 400,
+      height: 400,
+      image_format: 'jpeg',
+      jpeg_quality: 90
+    });
+
+    if (window.innerWidth < 500) {
+      Webcam.set({ width: 300, height: 300 });
+    }
+
+    Webcam.attach('#camera');
+
+    function applyRotation() {
+      const camera = document.getElementById('camera');
+      camera.style.transform = `rotate(${rotation}deg)`;
+    }
+
+    function rotateLeft() {
+      rotation = (rotation - 90 + 360) % 360;
+      applyRotation();
+    }
+
+    function rotateRight() {
+      rotation = (rotation + 90) % 360;
+      applyRotation();
+    }
+
+    function takeSnapshot() {
+      Webcam.snap(function(data_uri) {
+        // Create image and canvas
+        const img = new Image();
+        img.src = data_uri;
+
+        img.onload = function () {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+
+          // Handle rotation
+          if (rotation % 180 === 0) {
+            canvas.width = img.width;
+            canvas.height = img.height;
+          } else {
+            canvas.width = img.height;
+            canvas.height = img.width;
+          }
+
+          ctx.save();
+          switch (rotation) {
+            case 90:
+              ctx.translate(canvas.width, 0);
+              ctx.rotate(Math.PI / 2);
+              break;
+            case 180:
+              ctx.translate(canvas.width, canvas.height);
+              ctx.rotate(Math.PI);
+              break;
+            case 270:
+              ctx.translate(0, canvas.height);
+              ctx.rotate(3 * Math.PI / 2);
+              break;
+          }
+          ctx.drawImage(img, 0, 0);
+          ctx.restore();
+
+          const rotatedData = canvas.toDataURL('image/jpeg');
+          fetch('/capture', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'image=' + encodeURIComponent(rotatedData)
+          })
+          .then(res => res.json())
+          .then(data => alert('Saved as ' + data.filename));
+        };
+      });
+    }
+  </script>
+</body>
+</html>
