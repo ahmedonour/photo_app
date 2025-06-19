@@ -59,87 +59,87 @@
     <button onclick="takeSnapshot()">📸 Capture</button>
   </div>
 
-  <script>
-    let rotation = 0;
+<script>
+  let rotation = 0;
 
-    Webcam.set({
-      width: 400,
-      height: 400,
-      image_format: 'jpeg',
-      jpeg_quality: 90
+  Webcam.set({
+    width: 400,
+    height: 400,
+    image_format: 'jpeg',
+    jpeg_quality: 90
+  });
+
+  if (window.innerWidth < 500) {
+    Webcam.set({ width: 300, height: 300 });
+  }
+
+  Webcam.attach('#camera');
+
+  function applyRotation() {
+    const camera = document.getElementById('camera');
+    camera.style.transform = `rotate(${rotation}deg)`;
+  }
+
+  function rotateLeft() {
+    rotation = (rotation - 90 + 360) % 360;
+    applyRotation();
+  }
+
+  function rotateRight() {
+    rotation = (rotation + 90) % 360;
+    applyRotation();
+  }
+
+  function takeSnapshot() {
+    Webcam.snap(function(data_uri) {
+      const img = new Image();
+      img.src = data_uri;
+
+      img.onload = function () {
+        const originalW = img.width;
+        const originalH = img.height;
+        const side = Math.min(originalW, originalH);
+
+        // Center crop
+        const sx = (originalW - side) / 2;
+        const sy = (originalH - side) / 2;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = side;
+        canvas.height = side;
+        const ctx = canvas.getContext('2d');
+
+        ctx.save();
+
+        // Handle rotation
+        if (rotation !== 0) {
+          if (rotation === 90 || rotation === 270) {
+            canvas.width = side;
+            canvas.height = side;
+          }
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate((rotation * Math.PI) / 180);
+          ctx.translate(-canvas.width / 2, -canvas.height / 2);
+        }
+
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, side, side);
+        ctx.restore();
+
+        const croppedData = canvas.toDataURL('image/jpeg');
+        fetch('/capture', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: 'image=' + encodeURIComponent(croppedData)
+        })
+        .then(res => res.json())
+        .then(data => alert('Saved as ' + data.filename));
+      };
     });
+  }
+</script>
 
-    if (window.innerWidth < 500) {
-      Webcam.set({ width: 300, height: 300 });
-    }
 
-    Webcam.attach('#camera');
-
-    function applyRotation() {
-      const camera = document.getElementById('camera');
-      camera.style.transform = `rotate(${rotation}deg)`;
-    }
-
-    function rotateLeft() {
-      rotation = (rotation - 90 + 360) % 360;
-      applyRotation();
-    }
-
-    function rotateRight() {
-      rotation = (rotation + 90) % 360;
-      applyRotation();
-    }
-
-    function takeSnapshot() {
-      Webcam.snap(function(data_uri) {
-        // Create image and canvas
-        const img = new Image();
-        img.src = data_uri;
-
-        img.onload = function () {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-
-          // Handle rotation
-          if (rotation % 180 === 0) {
-            canvas.width = img.width;
-            canvas.height = img.height;
-          } else {
-            canvas.width = img.height;
-            canvas.height = img.width;
-          }
-
-          ctx.save();
-          switch (rotation) {
-            case 90:
-              ctx.translate(canvas.width, 0);
-              ctx.rotate(Math.PI / 2);
-              break;
-            case 180:
-              ctx.translate(canvas.width, canvas.height);
-              ctx.rotate(Math.PI);
-              break;
-            case 270:
-              ctx.translate(0, canvas.height);
-              ctx.rotate(3 * Math.PI / 2);
-              break;
-          }
-          ctx.drawImage(img, 0, 0);
-          ctx.restore();
-
-          const rotatedData = canvas.toDataURL('image/jpeg');
-          fetch('/capture', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: 'image=' + encodeURIComponent(rotatedData)
-          })
-          .then(res => res.json())
-          .then(data => alert('Saved as ' + data.filename));
-        };
-      });
-    }
-  </script>
 </body>
 </html>
